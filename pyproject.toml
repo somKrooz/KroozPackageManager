@@ -1,0 +1,23 @@
+[project]
+name = "krooz"
+version = "0.0.1"
+description = "Personal CLI Application For Downloading Template Files"
+readme = "README.md"
+requires-python = ">=3.7"
+license = "MIT"
+authors = [{name = "somKrooz", email = "somkrooz80@gmail.com"}]
+dependencies = [
+    "typer",
+    "python-dotenv",
+    "requests"
+]
+
+[project.scripts]
+krooz = "PackageManager.cli:app"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["PackageManager"]  #
