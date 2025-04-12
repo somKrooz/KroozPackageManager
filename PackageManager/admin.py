@@ -1,86 +1,107 @@
 import os
-from dotenv import load_dotenv
 import base64
+import subprocess
 import requests
+from .env import GetEnvMeta
 
-load_dotenv()
-GIT_TOKEN = os.getenv("GIT_TOKN")
-REPO_BASE_URL = os.getenv("REPO_BASE_URL")
+URL = GetEnvMeta().REPO_BASE_URL
+Header = {
+  "Authorization" : f"token {GetEnvMeta().GIT_TOKN}",
+  "Accept": "application/vnd.github+json",
+}
 
-def Push(name :str , commit : str) -> None:
+
+def SendRequestAsAdmin():
+  BaseUrl = GetEnvMeta().REPO_BASE_URL()
+
+def GetFilePath(name:str) -> str:
   current = os.getcwd()
-  path = os.path.join(current ,name)
-  with open(path, "rb") as file:
-    content = file.read()
-    encoded_content = base64.b64encode(content).decode()
+  return os.path.join(current ,name)
 
-    url = f"{REPO_BASE_URL}{name}"
 
-    headers = {
-        "Authorization": f"token {GIT_TOKEN}",
-        "Accept": "application/vnd.github+json",
-    }
+def InvalidateAdmin() -> bool:
+    try:
+        UserEmail = subprocess.check_output(["git", "config", "user.email"], text=True).strip()
+        if UserEmail == GetEnvMeta().ADMIN_EMAIL.strip():
+            print(UserEmail)
+            print(GetEnvMeta().ADMIN_EMAIL.strip())
+            return True
 
-    data = {
-        "message": commit,
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        return False
+
+    return False
+
+class AdminCommands:
+  def __init__(self):
+    pass
+
+  def Push(self, Name) -> None:
+    file = GetFilePath(Name)
+    try:
+      with open(file, "rb") as file:
+        content = file.read()
+        encoded_content = base64.b64encode(content).decode()
+
+      url = URL + "/" +Name
+      data = {
+        "message": f"{Name}: has Been Pushed To The Registry",
         "content": encoded_content,
         "branch": "main",
-    }
-
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        data["sha"] = response.json()["sha"]
-
-    response = requests.put(url, json=data, headers=headers)
-
-    if response.status_code in [200, 201]:
-        print("✅ File uploaded successfully!")
-    else:
-        print("❌ Failed to upload.")
-
-
-def Delete(name: str, commit: str = "Deleting file") -> None:
-  url = f"{REPO_BASE_URL}{name}"
-
-  headers = {
-      "Authorization": f"token {GIT_TOKEN}",
-      "Accept": "application/vnd.github+json",
-  }
-
-  response = requests.get(url, headers=headers)
-
-  if response.status_code == 200:
-      sha = response.json().get("sha")
-
-      data = {
-          "message": commit,
-          "sha": sha,
-          "branch": "main",
       }
 
-      delete_response = requests.delete(url, headers=headers, json=data)
+      response = requests.get(url, headers=Header)
+      print(response)
+      if response.status_code == 200:
+        data["sha"] = response.json()["sha"]
 
-      if delete_response.status_code == 200:
-          print(f"✅ Deleted '{name}' from repo.")
+
+      elif response.status_code == 404:
+        print(f"{Name} does not exist. Creating new file...")
+
+      response = requests.put(url, json=data, headers=Header)
+
+      if response.status_code ==  200:
+        print("Successfully Pushed.." , "success")
       else:
-          print(f"❌ Failed to delete '{name}'. Status: {delete_response.status_code}\n{delete_response.text}")
+        print("Failed To Push.." , "error")
 
-  else:
-      print(f"❌ File '{name}' not found. Status: {response.status_code}")
+    except FileNotFoundError:
+      print("File  not found." , "error")
+    except Exception as _:
+      print("An error occurred: " , "error")
 
 
 
-def FilesInfoAsArray():
-  Content = []
-  path  = REPO_BASE_URL
-  req = requests.get(path)
-  for file in req.json():
-      if str(file['name']).startswith(".gitignore"):
-          continue
-      elif str(file['name']).endswith(".json"):
-          continue
+  def Delete(self , name) -> None:
+    isAdmin =  InvalidateAdmin()
+    try:
+      if (isAdmin):
+        url = URL + "/" + name
+
+        response = requests.get(url, headers=Header)
+        if response.status_code == 200:
+          sha = response.json()['sha']
+        else:
+           print("File Does Not Exist On The Registry")
+           return
+
+        data = {
+          "message": f"{name}: has Been Removed From The Registry",
+          "sha" : sha,
+          "branch": "main"
+        }
+
+        response = requests.delete(url, headers=Header, json=data)
+        if response.status_code == 200:
+          print("Sucessfully Removed")
+        else:
+          print("Failed to Remove")
 
       else:
-          Content.append(f"{file['name']}")
+        print("You Are Not Admin...")
 
-  return Content
+    except Exception as e:
+       print(f"Error {e}")

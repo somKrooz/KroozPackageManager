@@ -1,54 +1,72 @@
-import typer
-from .Manager import search_query, get_packages_by_ext , create_download ,fuzzy_find ,CreateUrl,LookForRelations,HardDownload
-from .admin import Push , Delete
+import click
+from .Inspector import KroozInspector
+from .Admin import AdminCommands , InvalidateAdmin
+from .Manager import GetPossibleDownloads , KroozDownload ,SpitCode
+from dotenv import load_dotenv
 
-app = typer.Typer()
+load_dotenv()
 
-@app.command()
-def search(ext: str = typer.Option(..., "--ext", "--e", "-e", help="Download Packages Loacally")):
-    if ext:
-      get_packages_by_ext(ext)
-    else:
-      Arr = search_query()
-      for ext , package in Arr.items():
-        typer.echo(f"* {package} -> {ext} ")
+@click.group()
+def cli():
+  pass
 
-@app.command()
-def get(name: str = typer.Option(..., "--n", "--name", "-n", help="Package Name"),
-        force: bool = typer.Option(False, "--force", "-f", help="Try to fetch related .h/.cpp files even if missing")
-        ):
-    if not force:
-      create_download(str(name))
-    else:
-       Relations = LookForRelations(str(name))
-       print(Relations)
-       for i in Relations:
-          HardDownload(i)
+@click.command()
+@click.option('--ext', required=False, help="File extension to search for")
 
-@app.command()
-def fzf(name: str = typer.Option(..., "--name", "--n", "-n", help="Fuzzy Find Packages")):
-  Packages = search_query()
-  fuzzy_find(Packages , name)
+def search(ext):
+  Packages = KroozInspector()
+  data = Packages.GetFilesInfoAsArray()
+  if ext:
+    for packs in data:
+      if str(packs.name).endswith(f".{ext}"):
+        print(f"➤ {packs.name} -> {packs.type}")
+  else:
+    for pack in data:
+      print(f"➤ {pack.name} -> {pack.type}")
 
-@app.command()
-def geturl(name: str = typer.Option(..., "--name", "--n", "-n", help="Get Git Url")):
-  Name = CreateUrl(name)
-  typer.echo(Name)
+@click.command()
+@click.option('--name', required=True, help="Cat The File in Terminal")
+def cat(name:str):
+  Packages = KroozInspector()
+  data = Packages.MatchCase(name)
+  if(data != ""):
+    SpitCode(data)
 
-@app.command()
-def push(name:  str = typer.Option(..., "--name", "--n", "-n"),
-           commit: str = typer.Option(..., "--commit", "--c", "-c")):
 
-  Push(name , commit)
+@click.command()
+@click.option('--name', required=True, help="Download The File")
+@click.option('--force', is_flag=True , help="Force it to Download the same name Headers")
+def get(name: str , force: bool):
+  if not force:
+    packs = GetPossibleDownloads(name , False)
+    KroozDownload(packs)
+  else:
+    packs = GetPossibleDownloads(name , True)
+    KroozDownload(packs)
 
-@app.command()
-def remove(name:  str = typer.Option(..., "--name", "--n", "-n"),
-           commit: str = typer.Option(..., "--commit", "--c", "-c")):
+@click.command()
+@click.option('--name', required=True, help="Push files on Registry")
+def push(name: str):
+  command = AdminCommands()
+  isAdmin = InvalidateAdmin()
+  if isAdmin:
+    command.Push(name)
+  else:
+    print("You Are Not The Admin Buddy")
 
-  Delete(name , commit)
+@click.command()
+@click.option('--name', required=True, help="Remove files from Registry")
+def remove(name :str):
+  command = AdminCommands()
+  command.Delete(name)
+
+
+
+cli.add_command(search)
+cli.add_command(cat)
+cli.add_command(get)
+cli.add_command(push)
+cli.add_command(remove)
 
 def main():
-   app()
-
-if __name__ == "__main__":
-    main()
+  cli()
