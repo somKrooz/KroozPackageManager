@@ -1,5 +1,5 @@
-from .env import GetEnvMeta
-from .Inspector import KroozInspector
+from PackageManager.env import GetEnvMeta
+from PackageManager.Inspector import KroozInspector
 import requests
 
 def makeString(string:str):

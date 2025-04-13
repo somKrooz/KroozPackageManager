@@ -2,17 +2,7 @@ import os
 import base64
 import subprocess
 import requests
-from .env import GetEnvMeta
-
-URL = GetEnvMeta().REPO_BASE_URL
-Header = {
-  "Authorization" : f"token {GetEnvMeta().GIT_TOKN}",
-  "Accept": "application/vnd.github+json",
-}
-
-
-def SendRequestAsAdmin():
-  BaseUrl = GetEnvMeta().REPO_BASE_URL()
+from PackageManager.env import GetEnvMeta
 
 def GetFilePath(name:str) -> str:
   current = os.getcwd()
@@ -23,8 +13,6 @@ def InvalidateAdmin() -> bool:
     try:
         UserEmail = subprocess.check_output(["git", "config", "user.email"], text=True).strip()
         if UserEmail == GetEnvMeta().ADMIN_EMAIL.strip():
-            print(UserEmail)
-            print(GetEnvMeta().ADMIN_EMAIL.strip())
             return True
 
     except FileNotFoundError:
@@ -38,14 +26,21 @@ class AdminCommands:
   def __init__(self):
     pass
 
-  def Push(self, Name) -> None:
+  def Push(self, Name:str , RemoteName:str = None) -> None:
     file = GetFilePath(Name)
     try:
       with open(file, "rb") as file:
         content = file.read()
         encoded_content = base64.b64encode(content).decode()
 
-      url = URL + "/" +Name
+      upload_name = RemoteName if RemoteName else Name
+      url = f"{GetEnvMeta().REPO_BASE_URL}/{upload_name}"
+
+      Header = {
+        "Authorization" : f"token {GetEnvMeta().GIT_TOKN}",
+        "Accept": "application/vnd.github+json",
+      }
+
       data = {
         "message": f"{Name}: has Been Pushed To The Registry",
         "content": encoded_content,
@@ -53,10 +48,10 @@ class AdminCommands:
       }
 
       response = requests.get(url, headers=Header)
+
       print(response)
       if response.status_code == 200:
         data["sha"] = response.json()["sha"]
-
 
       elif response.status_code == 404:
         print(f"{Name} does not exist. Creating new file...")
@@ -70,38 +65,36 @@ class AdminCommands:
 
     except FileNotFoundError:
       print("File  not found." , "error")
-    except Exception as _:
-      print("An error occurred: " , "error")
-
+    except Exception as e:
+      print("An error occurred: " , {e})
 
 
   def Delete(self , name) -> None:
-    isAdmin =  InvalidateAdmin()
     try:
-      if (isAdmin):
-        url = URL + "/" + name
+      url = GetEnvMeta().REPO_BASE_URL + "/" + name
+      Header = {
+        "Authorization" : f"token {GetEnvMeta().GIT_TOKN}",
+        "Accept": "application/vnd.github+json",
+      }
 
-        response = requests.get(url, headers=Header)
-        if response.status_code == 200:
-          sha = response.json()['sha']
-        else:
-           print("File Does Not Exist On The Registry")
-           return
-
-        data = {
-          "message": f"{name}: has Been Removed From The Registry",
-          "sha" : sha,
-          "branch": "main"
-        }
-
-        response = requests.delete(url, headers=Header, json=data)
-        if response.status_code == 200:
-          print("Sucessfully Removed")
-        else:
-          print("Failed to Remove")
-
+      response = requests.get(url, headers=Header)
+      if response.status_code == 200:
+        sha = response.json()['sha']
       else:
-        print("You Are Not Admin...")
+          print("File Does Not Exist On The Registry")
+          return
+
+      data = {
+        "message": f"{name}: has Been Removed From The Registry",
+        "sha" : sha,
+        "branch": "main"
+      }
+
+      response = requests.delete(url, headers=Header, json=data)
+      if response.status_code == 200:
+        print("Sucessfully Removed")
+      else:
+        print("Failed to Remove")
 
     except Exception as e:
        print(f"Error {e}")

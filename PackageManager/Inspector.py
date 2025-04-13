@@ -1,6 +1,6 @@
 import requests
 from dataclasses import dataclass
-from .env import GetEnvMeta
+from PackageManager.env import GetEnvMeta
 
 def makeString(string:str):
   return string.strip().lower()
